@@ -16,13 +16,15 @@ namespace LoadBalancerService.Controllers
     {
         static Random random = new Random();
         private readonly ILBService _loadBalancerService;
+        private readonly IHttpClientFactory _clientFactory;
 
         private const string SERVER_NAME = "serverName";
         private const string CLIENT_IP = "clientIp";
 
-        public ValuesController(ILBService loadBalancerService)
+        public ValuesController(ILBService loadBalancerService, IHttpClientFactory clientFactory)
         {
             _loadBalancerService = loadBalancerService;
+            _clientFactory = clientFactory;
         }
 
         [HttpGet]
@@ -41,9 +43,16 @@ namespace LoadBalancerService.Controllers
                     string url = serverUrl + endpoint;
 
                     // Pass the request thru to servers
-                    using (HttpClient client = new HttpClient())
+                    var request = new HttpRequestMessage(HttpMethod.Get, url);
+                    var client = _clientFactory.CreateClient();
+                    var response = await client.SendAsync(request);
+                    if (response.IsSuccessStatusCode)
                     {
-                        return await client.GetStringAsync(url);
+                        return await response.Content.ReadAsStringAsync();
+                    }
+                    else
+                    {
+                        return BadRequest("Something went wrong");
                     }
                 }
                 else
