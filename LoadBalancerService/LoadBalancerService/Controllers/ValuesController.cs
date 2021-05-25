@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using LoadBalancerService.Services;
 using LoadBalancerService.Models;
 using LoadBalancerService.Filters;
+using Microsoft.Extensions.Logging;
 
 namespace LoadBalancerService.Controllers
 {
@@ -17,53 +18,69 @@ namespace LoadBalancerService.Controllers
         static Random random = new Random();
         private readonly ILBService _loadBalancerService;
         private readonly IHttpClientFactory _clientFactory;
+        private readonly ILogger<ValuesController> _logger;
 
         private const string SERVER_NAME = "serverName";
         private const string CLIENT_IP = "clientIp";
 
-        public ValuesController(ILBService loadBalancerService, IHttpClientFactory clientFactory)
+        public ValuesController(ILBService loadBalancerService, IHttpClientFactory clientFactory, ILogger<ValuesController> logger)
         {
             _loadBalancerService = loadBalancerService;
             _clientFactory = clientFactory;
+            _logger = logger;
         }
 
         [HttpGet]
         [ServiceFilter(typeof(GetLeastActiveServer))]
         public async Task<ActionResult<string>> GetData()
         {
-            string serverName = null;
-            if (HttpContext.Items.ContainsKey(CLIENT_IP) && HttpContext.Items[CLIENT_IP] != null)
+            try
             {
-                if (HttpContext.Items.ContainsKey(SERVER_NAME))
+                _logger.LogInformation("Entering GetData");
+                string serverName = null;
+                if (HttpContext.Items.ContainsKey(CLIENT_IP) && HttpContext.Items[CLIENT_IP] != null)
                 {
-                    serverName = HttpContext.Items[SERVER_NAME].ToString();
-
-                    string serverUrl = _loadBalancerService.ServerMap[serverName];
-                    string endpoint = "/api/values";
-                    string url = serverUrl + endpoint;
-
-                    // Pass the request thru to servers
-                    var request = new HttpRequestMessage(HttpMethod.Get, url);
-                    var client = _clientFactory.CreateClient();
-                    var response = await client.SendAsync(request);
-                    if (response.IsSuccessStatusCode)
+                    _logger.LogInformation($"Client IpAddress is {HttpContext.Items[CLIENT_IP]}");
+                    if (HttpContext.Items.ContainsKey(SERVER_NAME))
                     {
-                        return await response.Content.ReadAsStringAsync();
+                        serverName = HttpContext.Items[SERVER_NAME].ToString();
+                        _logger.LogInformation($"Server Name is {serverName}");
+
+                        string serverUrl = _loadBalancerService.ServerMap[serverName];
+                        string endpoint = "/api/values";
+                        string url = serverUrl + endpoint;
+
+                        // Pass the request thru to servers
+                        var request = new HttpRequestMessage(HttpMethod.Get, url);
+                        var client = _clientFactory.CreateClient();
+                        var response = await client.SendAsync(request);
+                        if (response.IsSuccessStatusCode)
+                        {
+                            return await response.Content.ReadAsStringAsync();
+                        }
+                        else
+                        {
+                            _logger.LogError($"Server {serverName} not responding");
+                            return BadRequest("Something went wrong");
+                        }
                     }
                     else
                     {
-                        return BadRequest("Something went wrong");
+                        _logger.LogError($"Server Name could not be found");
+                        return BadRequest("Server Name could not be found");
                     }
                 }
                 else
                 {
-                    return BadRequest("Server Name could not be found");
+                    // No Ip Address exist, cannot identify client. Return Error
+                    _logger.LogError($"X-Forwarded-For header missing");
+                    return BadRequest("X-Forwarded-For header missing");
                 }
             }
-            else
+            catch (Exception ex)
             {
-                // No Ip Address exist, cannot identify client. Return Error
-                return BadRequest("X-Forwarded-For header missing");
+                _logger.LogCritical(ex.Message);
+                return BadRequest("Something went wrong");
             }
         }
     }

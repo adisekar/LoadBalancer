@@ -35,6 +35,7 @@ namespace LoadBalancerService
             services.AddScoped<GetLeastActiveServer>();
             services.AddSingleton<ILBService, LBService>();
             services.AddHttpClient();
+            services.AddLogging();
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
