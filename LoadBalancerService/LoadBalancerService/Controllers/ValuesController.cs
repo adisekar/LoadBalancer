@@ -22,6 +22,9 @@ namespace LoadBalancerService.Controllers
 
         private const string SERVER_NAME = "serverName";
         private const string CLIENT_IP = "clientIp";
+        private const string SERVER_NOT_FOUND = "Server Name could not be found";
+        private const string IP_HEADER_MISSING = "X-Forwarded-For header missing";
+        private const string SOMETHING_WENT_WRONG = "Something went wrong";
 
         public ValuesController(ILBService loadBalancerService, IHttpClientFactory clientFactory, ILogger<ValuesController> logger)
         {
@@ -61,26 +64,26 @@ namespace LoadBalancerService.Controllers
                         else
                         {
                             _logger.LogError($"Server {serverName} not responding");
-                            return BadRequest("Something went wrong");
+                            return BadRequest(SOMETHING_WENT_WRONG);
                         }
                     }
                     else
                     {
-                        _logger.LogError($"Server Name could not be found");
-                        return BadRequest("Server Name could not be found");
+                        _logger.LogError(SERVER_NOT_FOUND);
+                        return BadRequest(SERVER_NOT_FOUND);
                     }
                 }
                 else
                 {
                     // No Ip Address exist, cannot identify client. Return Error
-                    _logger.LogError($"X-Forwarded-For header missing");
-                    return BadRequest("X-Forwarded-For header missing");
+                    _logger.LogError(IP_HEADER_MISSING);
+                    return BadRequest(IP_HEADER_MISSING);
                 }
             }
             catch (Exception ex)
             {
                 _logger.LogCritical(ex.Message);
-                return BadRequest("Something went wrong");
+                return BadRequest(SOMETHING_WENT_WRONG);
             }
         }
     }
