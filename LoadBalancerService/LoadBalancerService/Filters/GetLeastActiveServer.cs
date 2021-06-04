@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
+using System.Collections.Concurrent;
 
 namespace LoadBalancerService.Filters
 {
@@ -13,8 +14,8 @@ namespace LoadBalancerService.Filters
     {
         private readonly ILBService _loadBalancerService;
         static Random random = new Random();
-        private readonly IDictionary<string, ServerLastUpdated> clientServerMap;
-        private readonly IDictionary<string, HashSet<string>> activeServerSessions;
+        private readonly ConcurrentDictionary<string, ServerLastUpdated> clientServerMap;
+        private readonly ConcurrentDictionary<string, HashSet<string>> activeServerSessions;
 
         private const string SERVER_NAME = "serverName";
         private const string CLIENT_IP = "clientIp";
@@ -75,7 +76,7 @@ namespace LoadBalancerService.Filters
 
                         leastActiveServer.Value.Add(clientIp); // Adds new session
                         //clientServerMap.Add(clientIp, new ServerLastUpdated(serverName, DateTime.Now));
-                        clientServerMap.Add(clientIp, new ServerLastUpdated(context.HttpContext.Items[SERVER_NAME].ToString(), DateTime.Now));
+                        clientServerMap.TryAdd(clientIp, new ServerLastUpdated(context.HttpContext.Items[SERVER_NAME].ToString(), DateTime.Now));
                     }
                 }
                 else // Assign to any server node, as all of them are available
@@ -84,7 +85,7 @@ namespace LoadBalancerService.Filters
                     var serverName = randomServerId.ToString();
                     context.HttpContext.Items.Add(SERVER_NAME, serverName);
 
-                    clientServerMap.Add(clientIp, new ServerLastUpdated(serverName, DateTime.Now));
+                    clientServerMap.TryAdd(clientIp, new ServerLastUpdated(serverName, DateTime.Now));
                     activeServerSessions[serverName].Add(clientIp);
                 }
             }

@@ -8,6 +8,7 @@ using LoadBalancerService.Services;
 using LoadBalancerService.Models;
 using LoadBalancerService.Filters;
 using Microsoft.Extensions.Logging;
+using Microsoft.AspNetCore.Http;
 
 namespace LoadBalancerService.Controllers
 {
@@ -64,13 +65,13 @@ namespace LoadBalancerService.Controllers
                         else
                         {
                             _logger.LogError($"Server {serverName} not responding");
-                            return BadRequest(SOMETHING_WENT_WRONG);
+                            return StatusCode(StatusCodes.Status500InternalServerError, new { message = SOMETHING_WENT_WRONG });
                         }
                     }
                     else
                     {
                         _logger.LogError(SERVER_NOT_FOUND);
-                        return BadRequest(SERVER_NOT_FOUND);
+                        return StatusCode(StatusCodes.Status500InternalServerError, new { message = SERVER_NOT_FOUND });
                     }
                 }
                 else
@@ -83,7 +84,7 @@ namespace LoadBalancerService.Controllers
             catch (Exception ex)
             {
                 _logger.LogCritical(ex.Message);
-                return BadRequest(SOMETHING_WENT_WRONG);
+                return StatusCode(StatusCodes.Status500InternalServerError, new { message = SOMETHING_WENT_WRONG });
             }
         }
     }

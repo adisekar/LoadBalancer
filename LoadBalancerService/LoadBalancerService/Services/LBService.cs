@@ -4,12 +4,13 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using LoadBalancerService.Models;
+using System.Collections.Concurrent;
 
 namespace LoadBalancerService.Services
 {
     public class LBService : ILBService
     {
-        public IDictionary<string, string> ServerMap { get; set; }
+        public ConcurrentDictionary<string, string> ServerMap { get; set; }
 
         public IList<ServerDetail> ServiceDiscovery(IConfiguration config)
         {
@@ -31,19 +32,19 @@ namespace LoadBalancerService.Services
             ServerMap = SingletonService.GetServerMapInstance(serverDetails);
         }
 
-        public IDictionary<string, ServerLastUpdated> GetClientServerMapping()
+        public ConcurrentDictionary<string, ServerLastUpdated> GetClientServerMapping()
         {
             return SingletonService.GetClientServerMapInstance();
         }
 
-        public IDictionary<string, HashSet<string>> GetServerClientMapping(List<string> servers)
+        public ConcurrentDictionary<string, HashSet<string>> GetServerClientMapping(List<string> servers)
         {
-            IDictionary<string, HashSet<string>> activeServerSessions = SingletonService.GetServerSessionsMapInstance(servers);
+            ConcurrentDictionary<string, HashSet<string>> activeServerSessions = SingletonService.GetServerSessionsMapInstance(servers);
 
             return activeServerSessions;
         }
 
-        public void CleanUp(IDictionary<string, ServerLastUpdated> clientServerMap, IDictionary<string, HashSet<string>> activeServerSessions)
+        public void CleanUp(ConcurrentDictionary<string, ServerLastUpdated> clientServerMap, ConcurrentDictionary<string, HashSet<string>> activeServerSessions)
         {
             var iterationDictionary = clientServerMap.ToDictionary(entry => entry.Key,
                                                  entry => entry.Value);
@@ -54,7 +55,8 @@ namespace LoadBalancerService.Services
                     var clientId = kv.Key;
                     var serverName = kv.Value.Name;
                     activeServerSessions[serverName].Remove(clientId);
-                    clientServerMap.Remove(clientId);
+                    ServerLastUpdated _;
+                    clientServerMap.TryRemove(clientId, out _);
                 }
             }
         }

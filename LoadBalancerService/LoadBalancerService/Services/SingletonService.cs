@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -8,42 +9,63 @@ namespace LoadBalancerService.Services
 {
     public class SingletonService
     {
-        private static Dictionary<string, string> serverMap;
-        private static Dictionary<string, ServerLastUpdated> clientServerMap;
-        private static Dictionary<string, HashSet<string>> activeServerSessions;
+        private static ConcurrentDictionary<string, string> serverMap;
+        private static ConcurrentDictionary<string, ServerLastUpdated> clientServerMap;
+        private static ConcurrentDictionary<string, HashSet<string>> activeServerSessions;
+        private static object padlock = new object();
         private SingletonService() { }
 
-        public static Dictionary<string, string> GetServerMapInstance(IList<ServerDetail> serverDetails)
+        public static ConcurrentDictionary<string, string> GetServerMapInstance(IList<ServerDetail> serverDetails)
         {
             if (serverMap == null)
             {
-                serverMap = new Dictionary<string, string>();
-
-                foreach (var serverDetail in serverDetails)
+                // double checked locking
+                lock (padlock)
                 {
-                    serverMap.Add(serverDetail.Name, serverDetail.Url);
+                    if (serverMap == null)
+                    {
+                        serverMap = new ConcurrentDictionary<string, string>();
+                        foreach (var serverDetail in serverDetails)
+                        {
+                            serverMap.TryAdd(serverDetail.Name, serverDetail.Url);
+                        }
+                    }
                 }
             }
             return serverMap;
         }
 
-        public static Dictionary<string, ServerLastUpdated> GetClientServerMapInstance()
+        public static ConcurrentDictionary<string, ServerLastUpdated> GetClientServerMapInstance()
         {
+            // double checked locking
             if (clientServerMap == null)
             {
-                clientServerMap = new Dictionary<string, ServerLastUpdated>();
+                lock (padlock)
+                {
+                    if (clientServerMap == null)
+                    {
+                        clientServerMap = new ConcurrentDictionary<string, ServerLastUpdated>();
+                    }
+                }
             }
             return clientServerMap;
         }
 
-        public static Dictionary<string, HashSet<string>> GetServerSessionsMapInstance(List<string> servers)
+        public static ConcurrentDictionary<string, HashSet<string>> GetServerSessionsMapInstance(List<string> servers)
         {
             if (activeServerSessions == null)
             {
-                activeServerSessions = new Dictionary<string, HashSet<string>>();
-                foreach (var server in servers)
+                // double checked locking
+                lock (padlock)
                 {
-                    activeServerSessions.Add(server, new HashSet<string>());
+                    if (activeServerSessions == null)
+                    {
+                        activeServerSessions = new ConcurrentDictionary<string, HashSet<string>>();
+                        foreach (var server in servers)
+                        {
+                            activeServerSessions.TryAdd(server, new HashSet<string>());
+                        }
+                    }
                 }
             }
             return activeServerSessions;
